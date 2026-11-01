@@ -84,15 +84,16 @@
     }
   }
   async function loadPlan(me) {
-    const [ppl, days, slots, meta] = await Promise.all([
+    const [ppl, days, slots, meta, parties] = await Promise.all([
       all('turnos_people', '*', ['ord']), all('turnos_days', '*', ['park', 'd']), all('turnos_slots', '*', ['park', 'd', 'ord']),
-      me.role === 'employee' ? Promise.resolve([]) : all('turnos_meta')]);
+      me.role === 'employee' ? Promise.resolve([]) : all('turnos_meta'), all('turnos_parties', '*', ['park', 'd', 'n'])]);
     const PLAN = {}; const idx = {};
     for (const d of days) {
       const o = { d: d.d, t: d.t, fest: d.fest, open: d.open_t, close: d.close_t, walk: d.walk, parties: d.parties, booked: d.booked, slots: [] };
       (PLAN[d.park] = PLAN[d.park] || { days: [], open: {} }).days.push(o); idx[d.park + d.d] = o;
     }
     for (const z of slots) { const o = idx[z.park + z.d]; if (o) o.slots.push({ role: z.role, pos: z.pos, start: z.start_t, end: z.end_t, h: Number(z.h), pri: z.pri }); }
+    for (const p of parties) { const o = idx[p.park + p.d]; if (o) (o.plist = o.plist || []).push({ t: p.t, k: p.kids, tipo: p.tipo, av: p.av }); }
     const PEOPLE = ppl.map(p => ({ id: p.id, park: p.park, name: { es: p.name_es, uk: p.name_uk }, note: { es: p.note_es, uk: p.note_uk }, roles: p.roles, limit: p.limit_h === null ? null : Number(p.limit_h), per: p.per, ref: p.ref === null ? null : Number(p.ref), decl: p.decl, baja: p.baja }));
     const order = ['LL3', 'LL1', 'LL2', 'LL4', 'LL5'].filter(k => PLAN[k]);
     const m = meta.find(x => x.key === 'park_method');
@@ -191,7 +192,7 @@
       };
       setInterval(() => { if (!document.hidden) Object.keys(subs).forEach(refresh); }, POLL_MS);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) Object.keys(subs).forEach(refresh); });
-      const s = document.createElement('script'); s.src = 'app.js?v=202611011621';
+      const s = document.createElement('script'); s.src = 'app.js?v=202611011703';
       s.onload = () => { $('lg-wait').hidden = true; $('portal').hidden = false; };
       document.body.append(s);
     } catch (e) {
