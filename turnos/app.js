@@ -598,7 +598,7 @@ function renderMine(){const box=$('v-mine');box.replaceChildren();const me=S.me&
 /* ---------- збірка екрана ---------- */
 function renderView(){_renderView();$('v-req').hidden=true;$('v-ot').hidden=S.view!=='extra'||!isAdmin();$('vobtn').hidden=!isAdmin();if(S.view==='extra'&&!isAdmin())S.view='plan'}
 function render(){if(!ROLE()){renderGate();return}$('gate').hidden=true;$('app').hidden=false;reindex();const worker=!isMgrOf(S.park);if(!worker&&!S.wxOnce){S.wxOnce=true;pollWeather();pollOt()}document.body.classList.toggle('worker',worker);renderStatic();renderBell();if(worker){['v-plan','v-access','v-req','v-cost','v-emp','v-rules','v-ot'].forEach(i=>{$(i).hidden=true});$('v-mine').hidden=false;$('bell').hidden=!S.notifs.some(n=>!n.read_at);renderMine();return}
- $('v-mine').hidden=true;$('bell').hidden=false;applyMgr();renderView();renderWeeks();renderCov();renderGrid();renderDay();renderWx();renderDec();renderEmp();renderRules();renderCost();renderAccess();renderPhone();renderOt();$('people').parentElement.hidden=true;$('method').parentElement.hidden=true}
+ $('v-mine').hidden=true;$('bell').hidden=false;applyMgr();renderView();renderWeeks();renderPeople();renderCov();renderGrid();renderDay();renderWx();renderDec();renderEmp();renderRules();renderCost();renderAccess();renderPhone();renderOt();$('method').parentElement.hidden=true}
 
 render();
 (async()=>{const say=k=>{S.connMsg=k;$('conn').hidden=false;$('conn').textContent=tr(k)};
