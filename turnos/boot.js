@@ -84,20 +84,19 @@
     }
   }
   async function loadPlan(me) {
-    const [ppl, days, slots, meta, parties] = await Promise.all([
-      all('turnos_people', '*', ['ord']), all('turnos_days', '*', ['park', 'd']), all('turnos_slots', '*', ['park', 'd', 'ord']),
+    const [ppl, days, shifts, meta, parties] = await Promise.all([
+      all('turnos_people', '*', ['ord']), all('turnos_days', '*', ['park', 'd']), all('turnos_shifts', '*', ['park', 'd', 'start_t']),
       me.role === 'employee' ? Promise.resolve([]) : all('turnos_meta'), all('turnos_parties', '*', ['park', 'd', 'n'])]);
     const PLAN = {}; const idx = {};
     for (const d of days) {
-      const o = { d: d.d, t: d.t, fest: d.fest, open: d.open_t, close: d.close_t, walk: d.walk, parties: d.parties, booked: d.booked, slots: [] };
+      const o = { d: d.d, t: d.t, fest: d.fest, open: d.open_t, close: d.close_t, walk: d.walk, parties: d.parties, booked: d.booked, need: Number(d.need_h), slots: [] };
       (PLAN[d.park] = PLAN[d.park] || { days: [], open: {} }).days.push(o); idx[d.park + d.d] = o;
     }
-    for (const z of slots) { const o = idx[z.park + z.d]; if (o) o.slots.push({ role: z.role, pos: z.pos, start: z.start_t, end: z.end_t, h: Number(z.h), pri: z.pri }); }
     for (const p of parties) { const o = idx[p.park + p.d]; if (o) (o.plist = o.plist || []).push({ t: p.t, k: p.kids, tipo: p.tipo, av: p.av }); }
     const PEOPLE = ppl.map(p => ({ id: p.id, park: p.park, name: { es: p.name_es, uk: p.name_uk }, note: { es: p.note_es, uk: p.note_uk }, roles: p.roles, limit: p.limit_h === null ? null : Number(p.limit_h), per: p.per, ref: p.ref === null ? null : Number(p.ref), decl: p.decl, baja: p.baja }));
     const order = ['LL3', 'LL1', 'LL2', 'LL4', 'LL5'].filter(k => PLAN[k]);
     const m = meta.find(x => x.key === 'park_method');
-    return { PLAN, PEOPLE, PARK_ORDER: order, METHOD: m ? m.data : { es: {}, uk: {} } };
+    return { PLAN, PEOPLE, SHIFTS: shifts, PARK_ORDER: order, METHOD: m ? m.data : { es: {}, uk: {} } };
   }
 
   /* ---------- міст до коду сторінки ---------- */
@@ -147,6 +146,7 @@
         return {
           doc: id => docRef(name, id),
           onSnapshot(cb, err) {
+            if (name === 'claims') return () => { };                        // зміни читає pollShifts зі спільної таблиці turnos_shifts
             if (!MAP[name]) { setTimeout(() => cb({ docs: [] }), 0); return () => { }; }
             const s = subs[name] = subs[name] || { cbs: [], errs: [], sig: null };
             s.cbs.push(cb); if (err) s.errs.push(err); s.sig = null; refresh(name);
@@ -179,7 +179,7 @@
       if (error) throw error;
       if (!me) { started = false; await sb.auth.signOut(); $('lg-wait').hidden = true; showLogin(1); msg(tx('noaccess'), true); return; }
       const data = await loadPlan(me);
-      window.__T = Object.assign(data, { sb, me, kick, signOut: () => sb.auth.signOut().then(() => { try { localStorage.removeItem('ll_me'); } catch (e) { } location.reload(); }) });
+      window.__T = Object.assign(data, { sb, me, kick, all, signOut: () => sb.auth.signOut().then(() => { try { localStorage.removeItem('ll_me'); } catch (e) { } location.reload(); }) });
       try { if (!localStorage.getItem('ll3_lang')) localStorage.setItem('ll3_lang', me.lang || lang); } catch (e) { }
       const db = makeDb(me, u.user.id);
       window.claude = {
@@ -192,7 +192,7 @@
       };
       setInterval(() => { if (!document.hidden) Object.keys(subs).forEach(refresh); }, POLL_MS);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) Object.keys(subs).forEach(refresh); });
-      const s = document.createElement('script'); s.src = 'app.js?v=202611011703';
+      const s = document.createElement('script'); s.src = 'app.js?v=202611020125';
       s.onload = () => { $('lg-wait').hidden = true; $('portal').hidden = false; };
       document.body.append(s);
     } catch (e) {
