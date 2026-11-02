@@ -192,7 +192,7 @@
       };
       setInterval(() => { if (!document.hidden) Object.keys(subs).forEach(refresh); }, POLL_MS);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) Object.keys(subs).forEach(refresh); });
-      const s = document.createElement('script'); s.src = 'app.js?v=202611020125';
+      const s = document.createElement('script'); s.src = 'app.js?v=202611020131';
       s.onload = () => { $('lg-wait').hidden = true; $('portal').hidden = false; };
       document.body.append(s);
     } catch (e) {
