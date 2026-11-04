@@ -84,9 +84,10 @@
     }
   }
   async function loadPlan(me) {
-    const [ppl, days, shifts, meta, parties] = await Promise.all([
+    const [ppl, days, shifts, meta, parties, abs] = await Promise.all([
       all('turnos_people', '*', ['ord']), all('turnos_days', '*', ['park', 'd']), all('turnos_shifts', '*', ['park', 'd', 'start_t']),
-      me.role === 'employee' ? Promise.resolve([]) : all('turnos_meta'), all('turnos_parties', '*', ['park', 'd', 'n'])]);
+      me.role === 'employee' ? Promise.resolve([]) : all('turnos_meta'), all('turnos_parties', '*', ['park', 'd', 'n']),
+      all('turnos_absences', '*', ['d']).then(r => ({ ok: true, rows: r }), () => ({ ok: false, rows: [] }))]);   // відпустка й лікарняний (04.11); без таблиці — вимкнено
     const PLAN = {}; const idx = {};
     for (const d of days) {
       const o = { d: d.d, t: d.t, fest: d.fest, open: d.open_t, close: d.close_t, walk: d.walk, parties: d.parties, booked: d.booked, need: Number(d.need_h), slots: [] };
@@ -96,7 +97,7 @@
     const PEOPLE = ppl.map(p => ({ id: p.id, park: p.park, name: { es: p.name_es, uk: p.name_uk }, note: { es: p.note_es, uk: p.note_uk }, roles: p.roles, limit: p.limit_h === null ? null : Number(p.limit_h), per: p.per, ref: p.ref === null ? null : Number(p.ref), decl: p.decl, baja: p.baja }));
     const order = ['LL3', 'LL1', 'LL2', 'LL4', 'LL5'].filter(k => PLAN[k]);
     const m = meta.find(x => x.key === 'park_method');
-    return { PLAN, PEOPLE, SHIFTS: shifts, PARK_ORDER: order, METHOD: m ? m.data : { es: {}, uk: {} } };
+    return { PLAN, PEOPLE, SHIFTS: shifts, ABS: abs.rows, ABS_OK: abs.ok, PARK_ORDER: order, METHOD: m ? m.data : { es: {}, uk: {} } };
   }
 
   /* ---------- міст до коду сторінки ---------- */
@@ -192,7 +193,7 @@
       };
       setInterval(() => { if (!document.hidden) Object.keys(subs).forEach(refresh); }, POLL_MS);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) Object.keys(subs).forEach(refresh); });
-      const s = document.createElement('script'); s.src = 'app.js?v=202611020154';
+      const s = document.createElement('script'); s.src = 'app.js?v=202611041136';
       s.onload = () => { $('lg-wait').hidden = true; $('portal').hidden = false; };
       document.body.append(s);
     } catch (e) {
