@@ -84,20 +84,31 @@
     }
   }
   async function loadPlan(me) {
-    const [ppl, days, shifts, meta, parties, abs] = await Promise.all([
+    const [ppl, days, shifts, meta, parties, abs, names] = await Promise.all([
       all('turnos_people', '*', ['ord']), all('turnos_days', '*', ['park', 'd']), all('turnos_shifts', '*', ['park', 'd', 'start_t']),
       me.role === 'employee' ? Promise.resolve([]) : all('turnos_meta'), all('turnos_parties', '*', ['park', 'd', 'n']),
-      all('turnos_absences', '*', ['d']).then(r => ({ ok: true, rows: r }), () => ({ ok: false, rows: [] }))]);   // відпустка й лікарняний (04.11); без таблиці — вимкнено
+      all('turnos_absences', '*', ['d']).then(r => ({ ok: true, rows: r }), () => ({ ok: false, rows: [] })),   // відпустка й лікарняний (04.11); без таблиці — вимкнено
+      sb.rpc('park_names').then(r => (r.error ? [] : r.data || []), () => [])]);   // довідник парків (міграція 045); без нього — вбудовані назви
+    // місяць (15.11.2026): у базі можуть бути кілька місяців, портал показує один — ?m=РРРР-ММ, вибір у браузері (ll_month)
+    // або поточний; нема поточного — останній минулий, інакше перший. Сторінка розрахована на один місяць (тижні, ліміти, PDF).
+    const MONTHS = [...new Set(days.map(d => String(d.d).slice(0, 7)))].sort();
+    const cur = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' }).slice(0, 7);
+    let want = null; try { want = new URLSearchParams(location.search).get('m') || localStorage.getItem('ll_month'); } catch (e) { }
+    const MONTH = MONTHS.includes(want) ? want : MONTHS.includes(cur) ? cur : (MONTHS.filter(m => m <= cur).pop() || MONTHS[0]);
     const PLAN = {}; const idx = {};
     for (const d of days) {
+      if (String(d.d).slice(0, 7) !== MONTH) continue;
       const o = { d: d.d, t: d.t, fest: d.fest, open: d.open_t, close: d.close_t, walk: d.walk, parties: d.parties, booked: d.booked, need: Number(d.need_h), slots: [] };
       (PLAN[d.park] = PLAN[d.park] || { days: [], open: {} }).days.push(o); idx[d.park + d.d] = o;
     }
     for (const p of parties) { const o = idx[p.park + p.d]; if (o) (o.plist = o.plist || []).push({ t: p.t, k: p.kids, tipo: p.tipo, av: p.av }); }
     const PEOPLE = ppl.map(p => ({ id: p.id, park: p.park, name: { es: p.name_es, uk: p.name_uk }, note: { es: p.note_es, uk: p.note_uk }, roles: p.roles, limit: p.limit_h === null ? null : Number(p.limit_h), per: p.per, ref: p.ref === null ? null : Number(p.ref), decl: p.decl, baja: p.baja }));
-    const order = ['LL3', 'LL1', 'LL2', 'LL4', 'LL5'].filter(k => PLAN[k]);
+    // порядок: перші парки порталу як були, далі нові — за довідником (r3-4: новий парк — рядок у dim_park, не правка коду)
+    const order = [...['LL3', 'LL1', 'LL2'], ...names.map(n => n.park_id), ...Object.keys(PLAN).sort()]
+      .filter((k, i, a) => PLAN[k] && a.indexOf(k) === i);
+    const PARK_NAMES = Object.fromEntries(names.map(n => [n.park_id, String(n.name).replace(/^Limón Loco\s+/, '')]));
     const m = meta.find(x => x.key === 'park_method');
-    return { PLAN, PEOPLE, SHIFTS: shifts, ABS: abs.rows, ABS_OK: abs.ok, PARK_ORDER: order, METHOD: m ? m.data : { es: {}, uk: {} } };
+    return { PLAN, PEOPLE, MONTH, MONTHS, SHIFTS: shifts.filter(s => String(s.d).slice(0, 7) === MONTH), ABS: abs.rows, ABS_OK: abs.ok, PARK_ORDER: order, PARK_NAMES, METHOD: m ? m.data : { es: {}, uk: {} } };
   }
 
   /* ---------- міст до коду сторінки ---------- */
@@ -193,7 +204,7 @@
       };
       setInterval(() => { if (!document.hidden) Object.keys(subs).forEach(refresh); }, POLL_MS);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) Object.keys(subs).forEach(refresh); });
-      const s = document.createElement('script'); s.src = 'app.js?v=202611041136';
+      const s = document.createElement('script'); s.src = 'app.js?v=202611152301';
       s.onload = () => { $('lg-wait').hidden = true; $('portal').hidden = false; };
       document.body.append(s);
     } catch (e) {
